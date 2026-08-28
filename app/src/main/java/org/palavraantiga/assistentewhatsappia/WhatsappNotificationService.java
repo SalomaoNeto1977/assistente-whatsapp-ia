@@ -25,6 +25,7 @@ public class WhatsappNotificationService extends NotificationListenerService {
     private static final String TAG = "AssistenteWhatsAppIA";
     private static final long DUPLICATE_WINDOW_MS = 7_000L;
     private static final long FIRST_PREFIX_WINDOW_MS = 30L * 60L * 1000L;
+    private static final String WHATSAPP_BUSINESS_PACKAGE = "com.whatsapp.w4b";
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<String, Future<?>> pending = new ConcurrentHashMap<>();
@@ -70,7 +71,7 @@ public class WhatsappNotificationService extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        if (sbn == null || !isWhatsApp(sbn.getPackageName())) return;
+        if (sbn == null || !isWhatsAppBusiness(sbn.getPackageName())) return;
 
         String mode = Prefs.string(this, Prefs.MODE, Prefs.MODE_OFF);
         if (Prefs.MODE_OFF.equals(mode)) return;
@@ -225,8 +226,8 @@ public class WhatsappNotificationService extends NotificationListenerService {
         return pm != null && pm.isInteractive();
     }
 
-    private boolean isWhatsApp(String packageName) {
-        return "com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName);
+    private boolean isWhatsAppBusiness(String packageName) {
+        return WHATSAPP_BUSINESS_PACKAGE.equals(packageName);
     }
 
     private void cancelPending() {
