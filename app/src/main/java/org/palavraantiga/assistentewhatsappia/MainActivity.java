@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
@@ -62,7 +63,7 @@ public class MainActivity extends Activity {
         root.addView(title);
 
         TextView intro = new TextView(this);
-        intro.setText("Responde automaticamente às mensagens recebidas pelas notificações do WhatsApp, sem root e sem abrir o WhatsApp.");
+        intro.setText("Responde automaticamente apenas às mensagens do WhatsApp Business. O WhatsApp pessoal é sempre ignorado.");
         intro.setTextSize(15);
         intro.setPadding(0, dp(8), 0, dp(18));
         root.addView(intro);
@@ -81,6 +82,17 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(accessButton);
+
+        TextView backgroundNote = new TextView(this);
+        backgroundNote.setText("Importante: para enviar respostas sem teres de abrir o WhatsApp Business, coloca a bateria do WhatsApp Business em ‘Sem restrições’ / ‘Não restrita’.");
+        backgroundNote.setTextSize(13);
+        backgroundNote.setPadding(0, dp(12), 0, dp(4));
+        root.addView(backgroundNote);
+
+        Button businessBatteryButton = new Button(this);
+        businessBatteryButton.setText("Abrir definições do WhatsApp Business");
+        businessBatteryButton.setOnClickListener(v -> openWhatsAppBusinessSettings());
+        root.addView(businessBatteryButton);
 
         addHeading(root, "Funcionamento");
         addLabel(root, "Modo");
@@ -257,7 +269,7 @@ public class MainActivity extends Activity {
     private void refreshStatus() {
         boolean enabled = isNotificationListenerEnabled();
         accessStatus.setText(enabled
-                ? "✅ Acesso às notificações: autorizado"
+                ? "✅ Acesso às notificações: autorizado — apenas WhatsApp Business"
                 : "⚠️ Acesso às notificações: falta autorizar");
         accessStatus.setTextColor(enabled ? Color.rgb(0, 115, 50) : Color.rgb(180, 90, 0));
 
@@ -269,6 +281,21 @@ public class MainActivity extends Activity {
                 : activity);
         if (error != null && !error.isBlank()) status.append("\nÚltimo erro: ").append(error);
         runtimeStatus.setText(status.toString());
+    }
+
+    private void openWhatsAppBusinessSettings() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:com.whatsapp.w4b"));
+            startActivity(intent);
+            Toast.makeText(this,
+                    "Abre Bateria e escolhe ‘Sem restrições’ / ‘Não restrita’.",
+                    Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this,
+                    "Abre Definições > Aplicações > WhatsApp Business > Bateria > Sem restrições.",
+                    Toast.LENGTH_LONG).show();
+        }
     }
 
     private boolean isNotificationListenerEnabled() {
