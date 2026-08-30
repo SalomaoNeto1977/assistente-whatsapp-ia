@@ -1,0 +1,161 @@
+r.isFinite(metadata.queueIndex)
+      ? metadata.queueIndex : -1;
+    lastMetadata.queueLength = Number.isFinite(metadata.queueLength)
+      ? metadata.queueLength : 0;
+    lastMetadata.canPrevious = metadata.canPrevious === true;
+    lastMetadata.canNext = metadata.canNext === true;
+
+    if (typeof metadata.artwork === "string") {
+      lastMetadata.artwork = /^https:\/\//i.test(metadata.artwork)
+        ? metadata.artwork
+        : DEFAULT_ARTWORK;
+    }
+
+    lastMetadata.error = typeof metadata.error === "string" &&
+      metadata.error.trim() !== ""
+        ? metadata.error.trim()
+        : null;
+
+    if (lastMetadata.mode === "live") {
+      allById("np-titulo").forEach(function (title) {
+        if (title.textContent !== lastMetadata.title) {
+          title.textContent = lastMetadata.title;
+        }
+      });
+      updateArtwork(lastMetadata.artwork);
+    }
+  }
+
+  function ensureGlow(button) {
+    var glow = button.querySelector(".rpa-btn-glow");
+    if (!glow) {
+      glow = document.createElement("span");
+      glow.className = "rpa-btn-glow";
+      glow.setAttribute("aria-hidden", "true");
+      button.insertBefore(glow, button.firstChild);
+    }
+    return glow;
+  }
+
+  function updatePlayerDecorations(state) {
+    var radioState = lastMetadata.mode === "ondemand" ? "STOPPED" : state;
+    var cssState = stateClass(radioState);
+    var syncing = radioState === "SYNCING";
+    var active = ACTIVE_STATES.has(radioState);
+    var label = active ? "Parar rádio" : "Tocar rádio";
+
+    ["appPlayBtn", "playBtn"].forEach(function (id) {
+      allById(id).forEach(function (button) {
+        STATE_CLASSES.forEach(function (name) {
+          button.classList.remove(name);
+        });
+        button.classList.remove("on", "loading");
+        button.classList.add(cssState);
+        button.title = label;
+        button.setAttribute("aria-label", label);
+        button.setAttribute("aria-busy", syncing ? "true" : "false");
+        button.disabled = syncing || commandPending;
+        ensureGlow(button);
+      });
+    });
+
+    ["appBtnImg", "btnImg"].forEach(function (id) {
+      allById(id).forEach(function (image) {
+        image.classList.remove(
+          "stopped", "connecting", "playing", "error",
+          "rpa-stopped", "rpa-connecting", "rpa-playing", "rpa-error"
+        );
+        image.alt = label;
+      });
+    });
+
+    var playing = radioState === "PLAYING";
+    allById("vinylDisc").forEach(function (disc) {
+      disc.classList.toggle("vinyl-spin", playing);
+    });
+    allById("tonearm").forEach(function (arm) {
+      arm.classList.toggle("on", playing);
+    });
+    allById("needleShadow").forEach(function (shadow) {
+      shadow.style.opacity = playing ? "1" : "0";
+    });
+  }
+
+  function renderState(state, metadata) {
+    nativePlayerState = state;
+    commandPending = false;
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      pendingTimer = null;
+    }
+    updateMetadata(metadata);
+    updatePlayerDecorations(state);
+    if (typeof window.__RPA_MUSIC_RENDER_STATE === "function") {
+      window.__RPA_MUSIC_RENDER_STATE(state, lastMetadata);
+    }
+  }
+
+  function postCommand(action) {
+    if (!["PLAY", "PLAY_LIVE", "STOP", "PAUSE", "TOGGLE", "GET_STATE",
+          "RETRY", "RESUME", "MUSIC_RESUME", "NEXT", "NEXT_TRACK",
+          "PREVIOUS", "PREVIOUS_TRACK"].includes(action)) {
+      return false;
+    }
+
+    if (!window.RPA || typeof window.RPA.postMessage !== "function") {
+      return false;
+    }
+
+    var now = Date.now();
+    if (action !== "GET_STATE" && action === lastCommand &&
+        now - lastCommandAt < 400) {
+      return false;
+    }
+
+    lastCommand = action;
+    lastCommandAt = now;
+    window.RPA.postMessage(action);
+    return true;
+  }
+
+  function onPlayerClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    if (commandPending) return;
+
+    var action = lastMetadata.mode === "ondemand"
+      ? "PLAY"
+      : (ACTIVE_STATES.has(nativePlayerState) ? "STOP" : "PLAY");
+    if (!postCommand(action)) return;
+
+    commandPending = true;
+    updatePlayerDecorations(action === "PLAY" ? "CONNECTING" : "STOPPED");
+    pendingTimer = setTimeout(function () {
+      commandPending = false;
+      updatePlayerDecorations(nativePlayerState);
+      postCommand("GET_STATE");
+    }, 5000);
+  }
+
+  function bindButtons() {
+    ["appPlayBtn", "playBtn"].forEach(function (id) {
+      allById(id).forEach(function (oldButton) {
+        if (oldButton.getAttribute("data-rpa-native-button") === "true") {
+          ensureGlow(oldButton);
+          return;
+        }
+
+        var button = oldButton.cloneNode(true);
+        button.setAttribute("data-rpa-native-button", "true");
+        oldButton.replaceWith(button);
+        ensureGlow(button);
+        button.addEventListener("click", onPlayerClick, true);
+      });
+    });
+  }
+
+  function installStyles() {
+    if (document.getElementById("rpa-native-styles")) return;
+
+    var style = document.
