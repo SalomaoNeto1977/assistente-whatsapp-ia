@@ -1,0 +1,119 @@
+createElement("style");
+    style.id = "rpa-native-styles";
+    style.textContent = [
+      "button[data-rpa-native-button='true']{position:relative!important;",
+      "isolation:isolate;overflow:visible!important;}",
+      "button[data-rpa-native-button='true'] img{position:relative;z-index:1;",
+      "filter:none!important;animation:none!important;}",
+      "button[data-rpa-native-button='true'] .rpa-btn-glow{position:absolute;",
+      "inset:12%;z-index:-1;border-radius:50%;pointer-events:none;",
+      "opacity:.96;transform:scale(1);will-change:opacity,transform;",
+      "background:var(--rpa-glow-soft);box-shadow:0 0 12px 5px ",
+      "var(--rpa-glow),0 0 27px 10px var(--rpa-glow-soft);}",
+      "button.rpa-stopped{--rpa-glow:rgba(31,118,255,.96);",
+      "--rpa-glow-soft:rgba(31,118,255,.43);}",
+      "button.rpa-stopped .rpa-btn-glow{animation:none!important;}",
+      "button.rpa-connecting{--rpa-glow:rgba(255,197,34,.98);",
+      "--rpa-glow-soft:rgba(255,197,34,.48);}",
+      "button.rpa-connecting .rpa-btn-glow{animation:rpa-glow-pulse ",
+      ".46s ease-in-out infinite alternate;}",
+      "button.rpa-playing{--rpa-glow:rgba(234,46,52,.97);",
+      "--rpa-glow-soft:rgba(234,46,52,.45);}",
+      "button.rpa-playing .rpa-btn-glow{animation:rpa-glow-pulse ",
+      "1.8s ease-in-out infinite alternate;}",
+      "button.rpa-error{--rpa-glow:rgba(242,40,48,1);",
+      "--rpa-glow-soft:rgba(242,40,48,.55);}",
+      "button.rpa-error .rpa-btn-glow{animation:rpa-glow-pulse ",
+      ".22s ease-in-out infinite alternate;}",
+      "@keyframes rpa-glow-pulse{from{opacity:.36;transform:scale(.88);}",
+      "to{opacity:1;transform:scale(1.08);}}",
+      ".rpa-native-artist,.rpa-native-status,#np-artista,#np-artist,",
+      "#np-programa{display:none!important;}",
+      "button[data-rpa-native-button='true'][disabled]{cursor:wait!important;}",
+      "@media(prefers-reduced-motion:reduce){",
+      "button[data-rpa-native-button='true'] .rpa-btn-glow{",
+      "animation:none!important;opacity:1!important;}}"
+    ].join("");
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+
+  function installMusicArea() {
+    if (document.getElementById("rpa-app-bottom-nav") ||
+        typeof window.fetch !== "function") return;
+
+    var API_URL = "https://radio.palavraantiga.org/api/station/palavraantiga/ondemand";
+    var BASE_URL = "https://radio.palavraantiga.org";
+    var WHATSAPP_URL = "https://wa.me/351800500321";
+    var STORAGE_KEY = "rpa.music.library.v2";
+    var catalog = [];
+    var catalogLoaded = false;
+    var catalogLoading = false;
+    var activeView = "all";
+    var selectedTrackId = null;
+    var lastMusicState = "STOPPED";
+    var clockStartedAt = Date.now();
+
+    function escapeHtml(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function safeLibrary() {
+      var fallback = { favorites: [], playlists: {} };
+      try {
+        var raw = window.localStorage && window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          raw = window.localStorage && window.localStorage.getItem("rpa.music.library.v1");
+        }
+        if (!raw) return fallback;
+        var parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return fallback;
+        if (!Array.isArray(parsed.favorites)) parsed.favorites = [];
+        if (!parsed.playlists || typeof parsed.playlists !== "object") parsed.playlists = {};
+        return parsed;
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    var library = safeLibrary();
+
+    function saveLibrary() {
+      try {
+        if (window.localStorage) {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
+        }
+      } catch (_) {}
+    }
+
+    function absoluteUrl(value) {
+      try { return new URL(String(value || ""), BASE_URL).href; }
+      catch (_) { return ""; }
+    }
+
+    function artUrl(value) {
+      if (typeof value === "string") return absoluteUrl(value) || DEFAULT_ARTWORK;
+      if (value && typeof value === "object" && typeof value.url === "string") {
+        return absoluteUrl(value.url) || DEFAULT_ARTWORK;
+      }
+      return DEFAULT_ARTWORK;
+    }
+
+    function normalizeTrack(row) {
+      if (!row || typeof row !== "object") return null;
+      var media = row.media && typeof row.media === "object" ? row.media : {};
+      var id = String(row.track_id || media.id || "").trim();
+      var url = absoluteUrl(row.download_url);
+      if (!id || !/^https:\/\/radio\.palavraantiga\.org\//i.test(url)) return null;
+      return {
+        id: id,
+        url: url,
+        title: String(media.title || media.text || "Sem título").trim() || "Sem título",
+        artist: String(media.artist || "Rádio Palavra Antiga").trim() || "Rádio Palavra Antiga",
+        album: String(media.album || "").trim(),
+        artwork: artUrl(medi
