@@ -1,0 +1,165 @@
+/*
+ * Rádio Palavra Antiga — interface leve do leitor nativo Android.
+ *
+ * A página /app1 é apenas uma interface: nunca reproduz áudio nem decide
+ * se a emissão está a tocar. Todos os estados vêm do serviço nativo.
+ */
+(function () {
+  "use strict";
+
+  if (window.__RPA_BRIDGE_INSTALLED === true) {
+    if (window.RPA && typeof window.RPA.postMessage === "function") {
+      window.RPA.postMessage("GET_STATE");
+    }
+    return;
+  }
+
+  Object.defineProperty(window, "__RPA_BRIDGE_INSTALLED", {
+    value: true,
+    configurable: false,
+    writable: false
+  });
+
+  var DEFAULT_ARTWORK = "https://radio.palavraantiga.org/logo512.png";
+  var VALID_STATES = new Set([
+    "STOPPED", "CONNECTING", "PLAYING", "PAUSED",
+    "BUFFERING", "RECONNECTING", "ERROR"
+  ]);
+  var ACTIVE_STATES = new Set([
+    "PLAYING", "CONNECTING", "BUFFERING", "RECONNECTING"
+  ]);
+  var STATE_CLASSES = [
+    "rpa-stopped", "rpa-connecting", "rpa-playing", "rpa-error"
+  ];
+
+  var nativePlayerState = "SYNCING";
+  var lastMetadata = {
+    title: "Rádio Palavra Antiga",
+    artist: "",
+    album: "",
+    artwork: DEFAULT_ARTWORK,
+    error: null,
+    mode: "live",
+    positionMs: 0,
+    durationMs: null,
+    queueIndex: -1,
+    queueLength: 0,
+    canPrevious: false,
+    canNext: false
+  };
+  var lastCommand = "";
+  var lastCommandAt = 0;
+  var commandPending = true;
+  var pendingTimer = null;
+
+  try {
+    window.open = function (url) {
+      if (typeof url === "string" && url.length > 0) {
+        window.location.assign(url);
+      }
+      return null;
+    };
+  } catch (_) {}
+
+  function blockedAudioPlay() {
+    return Promise.reject(new DOMException(
+      "A reprodução é controlada pelo leitor nativo.",
+      "NotAllowedError"
+    ));
+  }
+
+  try {
+    if (window.HTMLAudioElement && window.HTMLAudioElement.prototype) {
+      Object.defineProperty(window.HTMLAudioElement.prototype, "play", {
+        configurable: true,
+        writable: true,
+        value: blockedAudioPlay
+      });
+    }
+  } catch (_) {}
+
+  /*
+   * Silencia antes de remover. Recarregar o elemento reabre a saída em algumas
+   * WebViews e provocava uma batida curta ao entrar na aplicação.
+   */
+  function neutralizeLegacyAudio() {
+    Array.prototype.slice.call(document.querySelectorAll("audio"))
+      .forEach(function (audio) {
+        try { audio.muted = true; } catch (_) {}
+        try { audio.volume = 0; } catch (_) {}
+        try { audio.preload = "none"; } catch (_) {}
+        try { audio.removeAttribute("autoplay"); } catch (_) {}
+        if (audio.paused === false) {
+          try { audio.pause(); } catch (_) {}
+        }
+        try { audio.removeAttribute("src"); } catch (_) {}
+        try {
+          Array.prototype.slice.call(audio.querySelectorAll("source"))
+            .forEach(function (source) {
+              source.removeAttribute("src");
+              source.remove();
+            });
+        } catch (_) {}
+        try { audio.remove(); } catch (_) {}
+      });
+  }
+
+  try {
+    if ("mediaSession" in navigator) {
+      ["play", "pause", "stop", "seekbackward", "seekforward",
+       "previoustrack", "nexttrack", "seekto"].forEach(function (action) {
+        try { navigator.mediaSession.setActionHandler(action, null); } catch (_) {}
+      });
+    }
+  } catch (_) {}
+
+  function allById(id) {
+    return Array.prototype.slice.call(
+      document.querySelectorAll('[id="' + id + '"]')
+    );
+  }
+
+  function stateClass(state) {
+    if (state === "PLAYING") return "rpa-playing";
+    if (state === "SYNCING" || state === "CONNECTING" ||
+        state === "BUFFERING" || state === "RECONNECTING") {
+      return "rpa-connecting";
+    }
+    if (state === "ERROR") return "rpa-error";
+    return "rpa-stopped";
+  }
+
+  function updateArtwork(url) {
+    var artwork = typeof url === "string" && /^https:\/\//i.test(url)
+      ? url
+      : DEFAULT_ARTWORK;
+
+    allById("np-capa").forEach(function (image) {
+      if (image.getAttribute("src") !== artwork) {
+        image.setAttribute("src", artwork);
+      }
+      image.setAttribute("alt", lastMetadata.title || "Capa da emissão");
+    });
+  }
+
+  function updateMetadata(metadata) {
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      metadata = {};
+    }
+
+    if (typeof metadata.title === "string") {
+      // O serviço Dart já aplica a formatação única usada também na MediaSession.
+      lastMetadata.title = metadata.title.trim() || "Rádio Palavra Antiga";
+    }
+    if (typeof metadata.artist === "string") {
+      lastMetadata.artist = metadata.artist.trim();
+    }
+    if (typeof metadata.album === "string") {
+      lastMetadata.album = metadata.album.trim();
+    }
+    lastMetadata.mode = metadata.mode === "ondemand" ? "ondemand" : "live";
+    lastMetadata.positionMs = Number.isFinite(metadata.positionMs)
+      ? Math.max(0, metadata.positionMs) : 0;
+    lastMetadata.durationMs = Number.isFinite(metadata.durationMs)
+      ? Math.max(0, metadata.durationMs) : null;
+    lastMetadata.queueIndex = Numbe
