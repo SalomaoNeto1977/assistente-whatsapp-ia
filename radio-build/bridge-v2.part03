@@ -1,0 +1,84 @@
+a.art)
+      };
+    }
+
+    function nativeTrack(track) {
+      return {
+        id: track.id,
+        url: track.url,
+        title: track.title,
+        artist: track.artist,
+        album: track.album || null,
+        artwork: track.artwork || DEFAULT_ARTWORK
+      };
+    }
+
+    function postJson(payload) {
+      if (!window.RPA || typeof window.RPA.postMessage !== "function") return false;
+      try {
+        window.RPA.postMessage(JSON.stringify(payload));
+        return true;
+      } catch (_) { return false; }
+    }
+
+    function setActiveTab(name) {
+      ["radio", "music"].forEach(function (tab) {
+        var button = document.getElementById("rpa-tab-" + tab);
+        if (button) button.classList.toggle("active", tab === name);
+      });
+    }
+
+    var panel = document.createElement("section");
+    panel.id = "rpa-music-panel";
+    panel.setAttribute("aria-hidden", "true");
+    panel.innerHTML = [
+      "<div class='rpa-music-shell'>",
+      "<header class='rpa-music-top'>",
+      "<div><span class='rpa-kicker'>PALAVRA ANTIGA</span><h1>Música</h1></div>",
+      "<button type='button' id='rpa-music-live' class='rpa-live-pill'>● Rádio ao vivo</button>",
+      "</header>",
+      "<section class='rpa-music-hero'>",
+      "<div class='rpa-hero-copy'><span>Louvor para todos os momentos</span><h2>A tua música cristã, num só lugar.</h2><p>Ouve, guarda as tuas favoritas e cria playlists pessoais.</p></div>",
+      "<div class='rpa-hero-icon' aria-hidden='true'>♪</div>",
+      "</section>",
+      "<section id='rpa-featured-section' class='rpa-featured-section'>",
+      "<div class='rpa-section-title'><h3>Em destaque</h3><span>Escolhe e ouve</span></div>",
+      "<div id='rpa-featured' class='rpa-featured'><div class='rpa-card-skeleton'></div><div class='rpa-card-skeleton'></div><div class='rpa-card-skeleton'></div></div>",
+      "</section>",
+      "<div class='rpa-music-search'><span aria-hidden='true'>⌕</span><input id='rpa-music-search' type='search' autocomplete='off' placeholder='O que queres ouvir?'></div>",
+      "<nav class='rpa-music-tabs' aria-label='Biblioteca'>",
+      "<button type='button' data-view='all' class='active'>Para ti</button>",
+      "<button type='button' data-view='favorites'>♥ Favoritos</button>",
+      "<button type='button' data-view='playlists'>Playlists</button>",
+      "</nav>",
+      "<div id='rpa-playlist-bar' class='rpa-playlist-bar'></div>",
+      "<div class='rpa-section-title rpa-list-heading'><h3 id='rpa-list-title'>Todas as músicas</h3><span id='rpa-list-count'></span></div>",
+      "<main id='rpa-track-list' class='rpa-track-list'><div class='rpa-music-loading'>A carregar o catálogo…</div></main>",
+      "<div id='rpa-music-mini' class='rpa-music-mini' hidden>",
+      "<img id='rpa-mini-art' alt='Capa'><div class='rpa-mini-copy'><b id='rpa-mini-title'>Música</b><span id='rpa-mini-artist'></span>",
+      "<input id='rpa-mini-progress' type='range' min='0' max='1000' value='0' aria-label='Posição da música'></div>",
+      "<div class='rpa-mini-controls'><button id='rpa-mini-prev' type='button' aria-label='Anterior'>‹‹</button><button id='rpa-mini-play' type='button' aria-label='Reproduzir ou pausar'>▶</button><button id='rpa-mini-next' type='button' aria-label='Seguinte'>››</button></div>",
+      "</div>",
+      "</div>",
+      "<div id='rpa-playlist-modal' class='rpa-playlist-modal' hidden><div><h3>Adicionar à playlist</h3><div id='rpa-playlist-options'></div>",
+      "<label>Nova playlist<input id='rpa-new-playlist-name' maxlength='40' placeholder='Ex.: Louvor'></label>",
+      "<div class='rpa-modal-actions'><button id='rpa-playlist-cancel' type='button'>Cancelar</button><button id='rpa-playlist-create' type='button'>Criar e adicionar</button></div></div></div>",
+      "</section>"
+    ].join("");
+    document.body.appendChild(panel);
+
+    var bottomNav = document.createElement("nav");
+    bottomNav.id = "rpa-app-bottom-nav";
+    bottomNav.setAttribute("aria-label", "Menu principal");
+    bottomNav.innerHTML = [
+      "<button id='rpa-tab-radio' class='active' type='button'><span aria-hidden='true'>◉</span><b>Rádio</b></button>",
+      "<button id='rpa-tab-music' type='button'><span aria-hidden='true'>♫</span><b>Música</b><i id='rpa-music-playing-dot' hidden></i></button>",
+      "<button id='rpa-tab-whatsapp' type='button'><span aria-hidden='true'>◌</span><b>WhatsApp</b></button>"
+    ].join("");
+    document.body.appendChild(bottomNav);
+
+    var style = document.createElement("style");
+    style.id = "rpa-music-styles";
+    style.textContent = [
+      "html{--rpa-bottom-nav-h:70px}body{padding-bottom:calc(var(--rpa-bottom-nav-h) + env(safe-area-inset-bottom))!important}",
+      "#rpa-app-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:2147483646;height:calc(var(--rpa-bottom-nav-h) + env(safe-area-inset-bottom));padding:6px 10px env(safe-area-inset-bottom);display:grid;grid-template-columns:repeat(3,1fr);align-items:center;background:rgba(18,18,18,.98);bor
