@@ -1,0 +1,62 @@
+utton{border:0;background:transparent;color:#ddd;font-size:19px;padding:8px 6px}.rpa-track-actions .fav.on{color:#e3a158}",
+      ".rpa-music-mini{position:absolute;left:7px;right:7px;bottom:7px;display:grid;grid-template-columns:50px minmax(0,1fr) auto;gap:9px;align-items:center;padding:7px;border-radius:9px;background:#5a351f;color:#fff;box-shadow:0 8px 28px rgba(0,0,0,.4);z-index:8}.rpa-music-mini[hidden]{display:none}.rpa-music-mini img{width:50px;height:50px;border-radius:5px;object-fit:cover}.rpa-mini-copy{min-width:0}.rpa-mini-copy b,.rpa-mini-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rpa-mini-copy b{font-size:12px}.rpa-mini-copy span{font-size:10px;color:#ead7c7}.rpa-mini-copy input{width:100%;height:3px;margin-top:6px;accent-color:#fff}.rpa-mini-controls{display:flex}.rpa-mini-controls button{border:0;background:transparent;color:#fff;font-size:18px;padding:8px 6px}.rpa-mini-controls button:disabled{opacity:.35}",
+      ".rpa-playlist-modal{position:absolute;inset:0;background:rgba(0,0,0,.72);display:grid;place-items:end center;padding:14px;z-index:20}.rpa-playlist-modal[hidden]{display:none}.rpa-playlist-modal>div{width:min(100%,520px);box-sizing:border-box;background:#242424;color:#fff;border-radius:18px;padding:16px;max-height:72vh;overflow:auto}.rpa-playlist-modal h3{margin:0 0 10px}.rpa-playlist-modal label{display:block;font-size:11px;color:#bbb;margin-top:12px}.rpa-playlist-modal input{box-sizing:border-box;width:100%;margin-top:5px;padding:11px;background:#333;color:#fff;border:1px solid #555;border-radius:8px}.rpa-playlist-option{display:block;width:100%;text-align:left;border:0;background:#333;color:#fff;border-radius:8px;padding:11px;margin:6px 0}.rpa-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}.rpa-modal-actions button{border:0;border-radius:999px;padding:9px 13px}.rpa-modal-actions #rpa-playlist-create{background:#fff;color:#111;font-weight:700}",
+      "@media(min-width:700px){#rpa-music-panel{left:50%;right:auto;width:min(760px,100vw);transform:translateX(105vw)}#rpa-music-panel.open{transform:translateX(-50%);box-shadow:0 0 0 100vw rgba(0,0,0,.55)}#rpa-app-bottom-nav{left:50%;right:auto;width:min(760px,100vw);transform:translateX(-50%);box-sizing:border-box}}",
+      "@media(prefers-reduced-motion:reduce){#rpa-music-panel{transition:none}}"
+    ].join("");
+    (document.head || document.documentElement).appendChild(style);
+
+    var trackList = document.getElementById("rpa-track-list");
+    var searchInput = document.getElementById("rpa-music-search");
+    var playlistBar = document.getElementById("rpa-playlist-bar");
+    var mini = document.getElementById("rpa-music-mini");
+    var progress = document.getElementById("rpa-mini-progress");
+    var modal = document.getElementById("rpa-playlist-modal");
+    var featured = document.getElementById("rpa-featured");
+    var featuredSection = document.getElementById("rpa-featured-section");
+
+    function playlistNames() {
+      return Object.keys(library.playlists).sort(function (a, b) {
+        return a.localeCompare(b, "pt-PT");
+      });
+    }
+
+    function tracksForView() {
+      var list = catalog.slice();
+      if (activeView === "favorites") {
+        var favs = new Set(library.favorites);
+        list = list.filter(function (track) { return favs.has(track.id); });
+      } else if (activeView.indexOf("playlist:") === 0) {
+        var name = activeView.slice(9);
+        var ids = new Set(library.playlists[name] || []);
+        list = list.filter(function (track) { return ids.has(track.id); });
+      } else if (activeView === "playlists") {
+        list = [];
+      }
+      var query = String(searchInput.value || "").trim().toLocaleLowerCase("pt-PT");
+      if (query) {
+        list = list.filter(function (track) {
+          return (track.title + " " + track.artist + " " + track.album)
+            .toLocaleLowerCase("pt-PT").indexOf(query) >= 0;
+        });
+      }
+      return list;
+    }
+
+    function renderFeatured() {
+      var show = activeView === "all" && !String(searchInput.value || "").trim();
+      featuredSection.style.display = show ? "block" : "none";
+      if (!show) return;
+      if (!catalogLoaded) {
+        featured.innerHTML = "<div class='rpa-card-skeleton'></div><div class='rpa-card-skeleton'></div><div class='rpa-card-skeleton'></div>";
+        return;
+      }
+      var items = catalog.slice(0, 8);
+      featured.innerHTML = items.map(function (track) {
+        return "<button type='button' class='rpa-feature-card' data-feature-id='" + escapeHtml(track.id) + "'><img src='" + escapeHtml(track.artwork) + "' alt=''><b>" + escapeHtml(track.title) + "</b><span>" + escapeHtml(track.artist) + "</span></button>";
+      }).join("") || "<div class='rpa-music-empty'>Ainda não existem destaques.</div>";
+    }
+
+    function renderPlaylistBar() {
+      var names = playlistNames();
+      if (activeView !== "playlists" && activeView.indexOf("playlist:") !== 0) 
