@@ -1,0 +1,105 @@
+{
+        playlistBar.innerHTML = "";
+        return;
+      }
+      var html = "<button type='button' data-new-playlist='1'>＋ Nova playlist</button>";
+      names.forEach(function (name) {
+        var active = activeView === "playlist:" + name ? " active" : "";
+        html += "<button type='button' class='" + active + "' data-playlist='" + escapeHtml(name) + "'>" + escapeHtml(name) + "</button>";
+      });
+      playlistBar.innerHTML = html;
+    }
+
+    function updateListHeading(count) {
+      var title = "Todas as músicas";
+      if (activeView === "favorites") title = "As tuas favoritas";
+      if (activeView === "playlists") title = "As tuas playlists";
+      if (activeView.indexOf("playlist:") === 0) title = activeView.slice(9);
+      document.getElementById("rpa-list-title").textContent = title;
+      document.getElementById("rpa-list-count").textContent = Number.isFinite(count) ? count + (count === 1 ? " faixa" : " faixas") : "";
+    }
+
+    function renderTracks() {
+      renderFeatured();
+      renderPlaylistBar();
+      if (activeView === "playlists" && playlistNames().length === 0) {
+        updateListHeading(0);
+        trackList.innerHTML = "<div class='rpa-music-empty'><b>Ainda não tens playlists.</b><br>Cria uma e adiciona as tuas músicas preferidas.</div>";
+        return;
+      }
+      if (activeView === "playlists") {
+        var names = playlistNames();
+        updateListHeading(names.length);
+        trackList.innerHTML = names.map(function (name) {
+          var count = (library.playlists[name] || []).length;
+          return "<button type='button' class='rpa-playlist-option' data-open-playlist='" + escapeHtml(name) + "'><b>♫ " + escapeHtml(name) + "</b><br><small>" + count + " música" + (count === 1 ? "" : "s") + "</small></button>";
+        }).join("") || "<div class='rpa-music-empty'>Nenhuma playlist.</div>";
+        return;
+      }
+      var list = tracksForView();
+      updateListHeading(list.length);
+      if (!list.length) {
+        trackList.innerHTML = catalogLoaded
+          ? "<div class='rpa-music-empty'>Não encontrei músicas aqui.</div>"
+          : "<div class='rpa-music-loading'>A carregar o catálogo…</div>";
+        return;
+      }
+      var favs = new Set(library.favorites);
+      trackList.innerHTML = list.map(function (track) {
+        return [
+          "<article class='rpa-track' data-id='", escapeHtml(track.id), "'>",
+          "<img src='", escapeHtml(track.artwork), "' alt=''>",
+          "<div class='rpa-track-copy' data-play='1'><b>", escapeHtml(track.title), "</b><span>",
+          escapeHtml(track.artist + (track.album ? " · " + track.album : "")), "</span></div>",
+          "<div class='rpa-track-actions'><button type='button' class='fav", favs.has(track.id) ? " on" : "", "' data-fav='1' aria-label='Favorito'>♥</button>",
+          "<button type='button' data-add='1' aria-label='Adicionar à playlist'>＋</button>",
+          "<button type='button' data-play='1' aria-label='Tocar'>▶</button></div></article>"
+        ].join("");
+      }).join("");
+    }
+
+    function loadCatalog() {
+      if (catalogLoaded || catalogLoading) return;
+      if (typeof window.fetch !== "function") {
+        trackList.innerHTML = "<div class='rpa-music-empty'>Este dispositivo não conseguiu abrir o catálogo Music.</div>";
+        return;
+      }
+      catalogLoading = true;
+      trackList.innerHTML = "<div class='rpa-music-loading'>A carregar músicas do AzuraCast…</div>";
+      window.fetch(API_URL, { headers: { "Accept": "application/json" }, cache: "no-store" })
+        .then(function (response) {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          var rows = Array.isArray(data) ? data : (Array.isArray(data.rows) ? data.rows : []);
+          catalog = rows.map(normalizeTrack).filter(Boolean);
+          catalogLoaded = true;
+          catalogLoading = false;
+          renderTracks();
+        })
+        .catch(function () {
+          catalogLoading = false;
+          trackList.innerHTML = "<div class='rpa-music-empty'><b>O catálogo ainda não está disponível.</b><br>Confirma no AzuraCast se a playlist está marcada para On-Demand.</div>";
+        });
+    }
+
+    function playTrack(track, sourceList) {
+      var list = sourceList && sourceList.length ? sourceList : [track];
+      var index = list.findIndex(function (item) { return item.id === track.id; });
+      if (index < 0) index = 0;
+      var from = Math.max(0, index - 49);
+      var to = Math.min(list.length, from + 100);
+      if (to - from < 100) from = Math.max(0, to - 100);
+      var queue = list.slice(from, to);
+      var queueIndex = queue.findIndex(function (item) { return item.id === track.id; });
+      selectedTrackId = track.id;
+      postJson({
+        action: "PLAY_TRACK",
+        track: nativeTrack(track),
+        queue: queue.map(nativeTrack),
+        queueIndex: queueIndex
+      });
+    }
+
+    function toggleFav
